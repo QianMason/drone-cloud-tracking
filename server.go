@@ -3,6 +3,7 @@ package main
 import (
 	_ "encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -15,9 +16,14 @@ import (
 )
 
 func main() {
-	port, success := os.LookupEnv("PORT")
-	fmt.Println("port lookup")
-	if !success {
+	var port string
+	args := os.Args
+	if len(args) > 2 {
+		log.Fatal("provided", len(args)-1, "number of arguments, expected 1")
+	} else if len(args) == 2 {
+		port = args[1]
+	} else {
+		fmt.Println("standard port")
 		port = "8080"
 	}
 	//models.Init()
