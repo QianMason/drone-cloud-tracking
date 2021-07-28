@@ -46,8 +46,46 @@ func NewRouter() *mux.Router {
 	db := &TrackDB{user: username, password: mongoPass}
 	r := mux.NewRouter()
 	r.HandleFunc("/tracking", db.TrackingPostHandler).Methods("POST")
+	r.HandleFunc("/tracking/{id}", db.TrackingGetHandler).Methods("GET")
 	r.HandleFunc("/create", db.CreateTrackingHandler).Methods("POST")
 	return r
+}
+
+//theoretically, this should be able to access a cache of memory somewhere
+func (t *TrackDB) TrackingGetHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("tracking get handler called")
+	uri := "mongodb+srv://" + t.user + ":" + t.password + "@cluster0.14i4y.mongodb.net/myFirstDatabase?retryWrites=true&w=majority"
+	clientOptions := options.Client().ApplyURI(uri)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		fmt.Println("uri:", uri)
+		log.Fatal(err)
+	}
+	defer func() {
+		if err = client.Disconnect(ctx); err != nil {
+			panic(err)
+		}
+	}()
+	tracking := &models.Tracking{}
+	params := mux.Vars(r)
+	dID := params["id"]
+
+	collection := client.Database("DronePlatform").Collection("trackingData")
+	err = collection.FindOne(
+		ctx,
+		bson.D{{"droneID", dID}}).Decode(tracking)
+	if err != nil {
+		fmt.Println("error findone")
+		fmt.Println(err)
+		return
+	}
+
+	jsn, err := json.Marshal(tracking)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	w.Write(jsn)
 }
 
 func (t *TrackDB) CreateTrackingHandler(w http.ResponseWriter, r *http.Request) {
@@ -75,9 +113,9 @@ func (t *TrackDB) CreateTrackingHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	rBody := string(body)
 	//unmarshalling request body into structs
-	trackingPost := &models.TrackingPost{}
+	trackingDevice := &models.TrackingDevice{}
 
-	err = json.Unmarshal([]byte(rBody), trackingPost)
+	err = json.Unmarshal([]byte(rBody), trackingDevice)
 	if err != nil {
 		fmt.Println("in here error unmarshalling:", err)
 		return
@@ -85,15 +123,15 @@ func (t *TrackDB) CreateTrackingHandler(w http.ResponseWriter, r *http.Request) 
 
 	timeStampLocation := models.TimeLocationStamp{
 		TimeStamp: time.Now().UTC(),
-		Lat:       trackingPost.Lat,
-		Lng:       trackingPost.Lng,
+		Lat:       trackingDevice.Lat,
+		Lng:       trackingDevice.Lng,
 	}
 
 	tsSlice := []models.TimeLocationStamp{timeStampLocation}
 
 	tracking := models.Tracking{
 		ID:           primitive.NewObjectID(),
-		DroneID:      trackingPost.DroneID,
+		DroneID:      trackingDevice.DroneID,
 		TimeLocation: tsSlice,
 		LastUpdated:  time.Now().UTC(),
 	}
@@ -149,7 +187,7 @@ func (t *TrackDB) TrackingPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	rBody := string(body)
 
-	tracking := &models.TrackingPost{}
+	tracking := &models.TrackingDevice{}
 
 	err = json.Unmarshal([]byte(rBody), tracking)
 	if err != nil {

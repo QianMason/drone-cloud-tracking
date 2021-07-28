@@ -13,7 +13,7 @@ type Tracking struct {
 	LastUpdated  time.Time           `json:"lastUpdated" bson:"lastUpdated"`
 }
 
-type TrackingPost struct {
+type TrackingDevice struct {
 	DroneID string  `json:"droneID" bson:"droneID"`
 	Lat     float64 `json:"lat,string" bson:"lat"`
 	Lng     float64 `json:"lng,string" bson:"lng"`
